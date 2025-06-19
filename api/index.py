@@ -64,3 +64,4 @@ def analyze():
         return jsonify({'error': '请提供链接'}), 400
     result = analyze_link(link)
     return jsonify(result)
+handler = app
