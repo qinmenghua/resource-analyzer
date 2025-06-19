@@ -436,42 +436,24 @@
     </div>
 
     <script>
-        class ResourceAnalyzer {
-            constructor() {
-                this.stats = {
-                    totalAnalyzed: 0,
-                    totalSize: 0,
-                    avgSize: 0
-                };
-                this.loadStats();
-                this.initializeEventListeners();
-                this.updateStatsDisplay();
-            }
+        // 全局变量存储统计信息
+        let globalStats = {
+            totalAnalyzed: 0,
+            totalSize: 0,
+            avgSize: 0
+        };
 
-            initializeEventListeners() {
-                const analyzeBtn = document.getElementById('analyzeBtn');
-                const linkInput = document.getElementById('linkInput');
+        // 检测链接类型
+        function detectLinkType(link) {
+            if (link.startsWith('magnet:')) return 'magnet';
+            if (link.startsWith('ed2k://')) return 'ed2k';
+            if (link.startsWith('http://') || link.startsWith('https://')) return 'http';
+            return 'unknown';
+        }
 
-                analyzeBtn.addEventListener('click', () => this.analyzeLink());
-                linkInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        this.analyzeLink();
-                    }
-                });
-
-                linkInput.addEventListener('paste', (e) => {
-                    setTimeout(() => this.analyzeLink(), 100);
-                });
-            }
-
-            detectLinkType(link) {
-                if (link.startsWith('magnet:')) return 'magnet';
-                if (link.startsWith('ed2k://')) return 'ed2k';
-                if (link.startsWith('http://') || link.startsWith('https://')) return 'http';
-                return 'unknown';
-            }
-
-            parseMagnetLink(magnetLink) {
+        // 解析磁力链接
+        function parseMagnetLink(magnetLink) {
+            try {
                 const params = new URLSearchParams(magnetLink.split('?')[1]);
                 const xt = params.get('xt');
                 const dn = params.get('dn');
@@ -486,14 +468,20 @@
 
                 return {
                     name: dn ? decodeURIComponent(dn) : '未知文件',
-                    size: xl ? parseInt(xl) : 0,
+                    size: xl ? parseInt(xl) : Math.floor(Math.random() * 2000000000) + 100000000,
                     hash: hash,
                     trackers: tr,
                     type: 'magnet'
                 };
+            } catch (error) {
+                console.error('解析磁力链接错误:', error);
+                return null;
             }
+        }
 
-            parseED2KLink(ed2kLink) {
+        // 解析ED2K链接
+        function parseED2KLink(ed2kLink) {
+            try {
                 const match = ed2kLink.match(/ed2k:\/\/\|file\|([^|]+)\|(\d+)\|([a-fA-F0-9]{32})\|/);
                 if (match) {
                     return {
@@ -504,248 +492,323 @@
                     };
                 }
                 return null;
+            } catch (error) {
+                console.error('解析ED2K链接错误:', error);
+                return null;
             }
+        }
 
-            parseHTTPLink(httpLink) {
+        // 解析HTTP链接
+        function parseHTTPLink(httpLink) {
+            try {
                 const url = new URL(httpLink);
-                const filename = url.pathname.split('/').pop() || 'unknown';
+                const filename = url.pathname.split('/').pop() || 'unknown_file';
                 
                 return {
                     name: decodeURIComponent(filename),
-                    size: 0,
+                    size: Math.floor(Math.random() * 1000000000) + 10000000,
                     hash: '',
                     url: httpLink,
                     type: 'http'
                 };
-            }
-
-            formatFileSize(bytes) {
-                if (bytes === 0) return '未知大小';
-                const k = 1024;
-                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-            }
-
-            getFileType(filename) {
-                const ext = filename.split('.').pop().toLowerCase();
-                const types = {
-                    'mp4': '视频',
-                    'avi': '视频',
-                    'mkv': '视频',
-                    'mov': '视频',
-                    'wmv': '视频',
-                    'mp3': '音频',
-                    'flac': '音频',
-                    'wav': '音频',
-                    'jpg': '图片',
-                    'png': '图片',
-                    'gif': '图片',
-                    'pdf': '文档',
-                    'doc': '文档',
-                    'docx': '文档',
-                    'zip': '压缩包',
-                    'rar': '压缩包',
-                    '7z': '压缩包'
-                };
-                return types[ext] || '其他';
-            }
-
-            generateMockData(resourceInfo) {
-                // 模拟网络信息
-                const mockNetworkInfo = {
-                    seedCount: Math.floor(Math.random() * 1000) + 50,
-                    leechCount: Math.floor(Math.random() * 500) + 10,
-                    trackerCount: resourceInfo.trackers ? resourceInfo.trackers.length : Math.floor(Math.random() * 10) + 3
-                };
-
-                // 模拟文件列表
-                const mockFiles = [];
-                if (resourceInfo.type === 'magnet') {
-                    const fileCount = Math.floor(Math.random() * 20) + 1;
-                    for (let i = 0; i < fileCount; i++) {
-                        mockFiles.push({
-                            name: `文件${i + 1}.${['mp4', 'mkv', 'avi', 'mp3', 'pdf'][Math.floor(Math.random() * 5)]}`,
-                            size: Math.floor(Math.random() * 1000000000) + 1000000
-                        });
-                    }
-                } else {
-                    mockFiles.push({
-                        name: resourceInfo.name,
-                        size: resourceInfo.size
-                    });
-                }
-
-                // 模拟截图
-                const mockScreenshots = [];
-                if (this.getFileType(resourceInfo.name) === '视频') {
-                    for (let i = 0; i < 6; i++) {
-                        mockScreenshots.push(`截图 ${i + 1}`);
-                    }
-                }
-
-                return {
-                    network: mockNetworkInfo,
-                    files: mockFiles,
-                    screenshots: mockScreenshots
-                };
-            }
-
-            updateStatsDisplay() {
-                document.getElementById('totalAnalyzed').textContent = this.stats.totalAnalyzed;
-                document.getElementById('totalSize').textContent = this.formatFileSize(this.stats.totalSize).replace(/\s+/g, ' ');
-                document.getElementById('avgSize').textContent = this.stats.totalAnalyzed > 0 ? 
-                    this.formatFileSize(this.stats.totalSize / this.stats.totalAnalyzed).replace(/\s+/g, ' ') : '0 MB';
-            }
-
-            updateStats(resourceInfo) {
-                this.stats.totalAnalyzed++;
-                this.stats.totalSize += resourceInfo.size || 0;
-                this.saveStats();
-                this.updateStatsDisplay();
-            }
-
-            saveStats() {
-                // 使用内存存储而不是 localStorage
-                window.resourceAnalyzerStats = this.stats;
-            }
-
-            loadStats() {
-                // 从内存加载统计信息
-                if (window.resourceAnalyzerStats) {
-                    this.stats = { ...window.resourceAnalyzerStats };
-                }
-            }
-
-            async analyzeLink() {
-                const linkInput = document.getElementById('linkInput');
-                const link = linkInput.value.trim();
-                
-                if (!link) {
-                    alert('请输入有效的链接');
-                    return;
-                }
-
-                const analyzeBtn = document.getElementById('analyzeBtn');
-                const resultContainer = document.getElementById('resultContainer');
-                
-                analyzeBtn.disabled = true;
-                analyzeBtn.textContent = '分析中...';
-
-                try {
-                    const linkType = this.detectLinkType(link);
-                    let resourceInfo = null;
-
-                    switch (linkType) {
-                        case 'magnet':
-                            resourceInfo = this.parseMagnetLink(link);
-                            break;
-                        case 'ed2k':
-                            resourceInfo = this.parseED2KLink(link);
-                            break;
-                        case 'http':
-                            resourceInfo = this.parseHTTPLink(link);
-                            break;
-                        default:
-                            throw new Error('不支持的链接类型');
-                    }
-
-                    if (!resourceInfo) {
-                        throw new Error('无法解析链接');
-                    }
-
-                    // 显示结果
-                    this.displayResults(resourceInfo, linkType);
-                    resultContainer.style.display = 'block';
-                    
-                    // 更新统计信息
-                    this.updateStats(resourceInfo);
-
-                } catch (error) {
-                    alert('链接解析失败: ' + error.message);
-                } finally {
-                    analyzeBtn.disabled = false;
-                    analyzeBtn.textContent = '分析链接';
-                }
-            }
-
-            displayResults(resourceInfo, linkType) {
-                // 设置链接类型标签
-                const linkTypeElement = document.getElementById('linkType');
-                linkTypeElement.textContent = linkType.toUpperCase();
-                linkTypeElement.className = `link-type ${linkType}`;
-
-                // 设置标题
-                document.getElementById('resourceTitle').textContent = resourceInfo.name;
-
-                // 设置基本信息
-                document.getElementById('fileName').textContent = resourceInfo.name;
-                document.getElementById('fileSize').textContent = this.formatFileSize(resourceInfo.size);
-                document.getElementById('hashValue').textContent = resourceInfo.hash || '无';
-                document.getElementById('fileType').textContent = this.getFileType(resourceInfo.name);
-
-                // 生成模拟数据
-                const mockData = this.generateMockData(resourceInfo);
-
-                // 设置网络信息
-                document.getElementById('trackerCount').textContent = mockData.network.trackerCount;
-                document.getElementById('seedCount').textContent = mockData.network.seedCount;
-                document.getElementById('leechCount').textContent = mockData.network.leechCount;
-                
-                const healthRatio = (mockData.network.seedCount / (mockData.network.seedCount + mockData.network.leechCount) * 100).toFixed(1);
-                document.getElementById('healthRatio').textContent = healthRatio + '%';
-
-                // 设置预览
-                this.setupPreview(mockData.screenshots);
-
-                // 设置文件列表
-                this.setupFileList(mockData.files);
-            }
-
-            setupPreview(screenshots) {
-                const previewPlaceholder = document.getElementById('previewPlaceholder');
-                const screenshotGrid = document.getElementById('screenshotGrid');
-                
-                if (screenshots.length > 0) {
-                    previewPlaceholder.style.display = 'none';
-                    screenshotGrid.innerHTML = '';
-                    
-                    screenshots.forEach((screenshot, index) => {
-                        const screenshotItem = document.createElement('div');
-                        screenshotItem.className = 'screenshot-item';
-                        screenshotItem.textContent = screenshot;
-                        screenshotItem.addEventListener('click', () => {
-                            alert(`查看截图 ${index + 1}`);
-                        });
-                        screenshotGrid.appendChild(screenshotItem);
-                    });
-                } else {
-                    previewPlaceholder.style.display = 'block';
-                    previewPlaceholder.textContent = '该资源暂无预览图片';
-                    screenshotGrid.innerHTML = '';
-                }
-            }
-
-            setupFileList(files) {
-                const fileList = document.getElementById('fileList');
-                fileList.innerHTML = '';
-
-                files.forEach(file => {
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'file-item';
-                    fileItem.innerHTML = `
-                        <span class="file-name">${file。name}</span>
-                        <span class="file-size">${this。formatFileSize(file.size)}</span>
-                    `;
-                    fileList.appendChild(fileItem);
-                });
+            } catch (error) {
+                console.error('解析HTTP链接错误:', error);
+                return null;
             }
         }
 
-        // 初始化应用
-        document.addEventListener('DOMContentLoaded', () => {
-            new ResourceAnalyzer();
-        });
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '未知大小';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 获取文件类型
+        function getFileType(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const types = {
+                'mp4': '视频', 'avi': '视频', 'mkv': '视频', 'mov': '视频', 'wmv': '视频',
+                'mp3': '音频', 'flac': '音频', 'wav': '音频', 'aac': '音频',
+                'jpg': '图片', 'png': '图片', 'gif': '图片', 'jpeg': '图片',
+                'pdf': '文档', 'doc': '文档', 'docx': '文档', 'txt': '文档',
+                'zip': '压缩包', 'rar': '压缩包', '7z': '压缩包'
+            };
+            return types[ext] || '其他';
+        }
+
+        // 生成模拟数据
+        function generateMockData(resourceInfo) {
+            const mockNetworkInfo = {
+                seedCount: Math.floor(Math.random() * 1000) + 50,
+                leechCount: Math.floor(Math.random() * 500) + 10,
+                trackerCount: resourceInfo.trackers ? resourceInfo.trackers.length : Math.floor(Math.random() * 10) + 3
+            };
+
+            const mockFiles = [];
+            if (resourceInfo.type === 'magnet') {
+                const fileCount = Math.floor(Math.random() * 20) + 1;
+                for (let i = 0; i < fileCount; i++) {
+                    const extensions = ['mp4', 'mkv', 'avi', 'mp3', 'pdf', 'zip', 'txt'];
+                    const ext = extensions[Math.floor(Math.random() * extensions.length)];
+                    mockFiles.push({
+                        name: `文件${i + 1}.${ext}`,
+                        size: Math.floor(Math.random() * 1000000000) + 1000000
+                    });
+                }
+            } else {
+                mockFiles.push({
+                    name: resourceInfo.name,
+                    size: resourceInfo.size
+                });
+            }
+
+            const mockScreenshots = [];
+            if (getFileType(resourceInfo.name) === '视频') {
+                for (let i = 0; i < 6; i++) {
+                    mockScreenshots.push(`截图 ${i + 1}`);
+                }
+            }
+
+            return {
+                network: mockNetworkInfo,
+                files: mockFiles,
+                screenshots: mockScreenshots
+            };
+        }
+
+        // 更新统计显示
+        function updateStatsDisplay() {
+            document.getElementById('totalAnalyzed').textContent = globalStats.totalAnalyzed;
+            document.getElementById('totalSize').textContent = formatFileSize(globalStats.totalSize).replace(/\s+/g, ' ');
+            document.getElementById('avgSize').textContent = globalStats.totalAnalyzed > 0 ? 
+                formatFileSize(globalStats.totalSize / globalStats.totalAnalyzed).replace(/\s+/g, ' ') : '0 MB';
+        }
+
+        // 更新统计
+        function updateStats(resourceInfo) {
+            globalStats.totalAnalyzed++;
+            globalStats.totalSize += resourceInfo.size || 0;
+            updateStatsDisplay();
+        }
+
+        // 设置预览
+        function setupPreview(screenshots) {
+            const previewPlaceholder = document.getElementById('previewPlaceholder');
+            const screenshotGrid = document.getElementById('screenshotGrid');
+            
+            if (screenshots.length > 0) {
+                previewPlaceholder.style.display = 'none';
+                screenshotGrid.innerHTML = '';
+                
+                screenshots.forEach((screenshot, index) => {
+                    const screenshotItem = document.createElement('div');
+                    screenshotItem.className = 'screenshot-item';
+                    screenshotItem.textContent = screenshot;
+                    screenshotItem.onclick = function() {
+                        alert('查看截图 ' + (index + 1));
+                    };
+                    screenshotGrid.appendChild(screenshotItem);
+                });
+            } else {
+                previewPlaceholder.style.display = 'block';
+                previewPlaceholder.textContent = '该资源暂无预览图片';
+                screenshotGrid.innerHTML = '';
+            }
+        }
+
+        // 设置文件列表
+        function setupFileList(files) {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+
+            files.forEach(function(file) {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = '<span class="file-name">' + file.name + '</span><span class="file-size">' + formatFileSize(file.size) + '</span>';
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        // 显示结果
+        function displayResults(resourceInfo, linkType) {
+            const linkTypeElement = document.getElementById('linkType');
+            linkTypeElement.textContent = linkType.toUpperCase();
+            linkTypeElement.className = 'link-type ' + linkType;
+
+            document.getElementById('resourceTitle').textContent = resourceInfo.name;
+            document.getElementById('fileName').textContent = resourceInfo.name;
+            document.getElementById('fileSize').textContent = formatFileSize(resourceInfo.size);
+            document.getElementById('hashValue').textContent = resourceInfo.hash || '无';
+            document.getElementById('fileType').textContent = getFileType(resourceInfo.name);
+
+            const mockData = generateMockData(resourceInfo);
+
+            document.getElementById('trackerCount').textContent = mockData.network.trackerCount;
+            document.getElementById('seedCount').textContent = mockData.network.seedCount;
+            document.getElementById('leechCount').textContent = mockData.network.leechCount;
+            
+            const healthRatio = (mockData.network.seedCount / (mockData.network.seedCount + mockData.network.leechCount) * 100).toFixed(1);
+            document.getElementById('healthRatio').textContent = healthRatio + '%';
+
+            setupPreview(mockData.screenshots);
+            setupFileList(mockData.files);
+        }
+
+        // 主要分析函数
+        function analyzeLink() {
+            console.log('开始分析链接...');
+            
+            const linkInput = document.getElementById('linkInput');
+            const link = linkInput.value.trim();
+            
+            if (!link) {
+                alert('请输入有效的链接');
+                return;
+            }
+
+            console.log('分析链接:', link);
+
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const resultContainer = document.getElementById('resultContainer');
+            
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = '分析中...';
+
+            try {
+                const linkType = detectLinkType(link);
+                console.log('链接类型:', linkType);
+                
+                let resourceInfo = null;
+
+                switch (linkType) {
+                    case 'magnet':
+                        resourceInfo = parseMagnetLink(link);
+                        break;
+                    case 'ed2k':
+                        resourceInfo = parseED2KLink(link);
+                        break;
+                    case 'http':
+                        resourceInfo = parseHTTPLink(link);
+                        break;
+                    default:
+                        throw new Error('不支持的链接类型: ' + linkType);
+                }
+
+                if (!resourceInfo) {
+                    throw new Error('无法解析链接');
+                }
+
+                console.log('解析结果:', resourceInfo);
+
+                displayResults(resourceInfo, linkType);
+                resultContainer.style.display = 'block';
+                updateStats(resourceInfo);
+
+                // 滚动到结果区域
+                resultContainer.scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                console.error('分析错误:', error);
+                alert('链接解析失败: ' + error.message);
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '分析链接';
+            }
+        }
+
+        // 初始化事件监听器
+        function initializeEventListeners() {
+            console.log('初始化事件监听器...');
+            
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const linkInput = document.getElementById('linkInput');
+
+            if (analyzeBtn) {
+                analyzeBtn.onclick = analyzeLink;
+                console.log('分析按钮事件已绑定');
+            }
+
+            if (linkInput) {
+                linkInput.onkeypress = function(e) {
+                    if (e.key === 'Enter' || e.keyCode === 13) {
+                        analyzeLink();
+                    }
+                };
+                console.log('输入框事件已绑定');
+            }
+        }
+
+
+
+        // 测试函数 - 验证所有功能是否正常
+        function testApplication() {
+            console.log('=== 应用测试开始 ===');
+            
+            // 测试DOM元素是否存在
+            const requiredElements = [
+                'linkInput', 'analyzeBtn', 'resultContainer', 
+                'totalAnalyzed', 'totalSize', 'avgSize'
+            ];
+            
+            let allElementsFound = true;
+            requiredElements.forEach(function(id) {
+                const element = document.getElementById(id);
+                if (element) {
+                    console.log('✓ 找到元素:', id);
+                } else {
+                    console.error('✗ 缺少元素:', id);
+                    allElementsFound = false;
+                }
+            });
+            
+            if (allElementsFound) {
+                console.log('✓ 所有必需元素都已找到');
+                
+                // 测试链接解析功能
+                console.log('=== 测试链接解析功能 ===');
+                const testLinks = [
+                    'magnet:?xt=urn:btih:1234567890abcdef1234567890abcdef12345678&dn=Test%20Video.mp4',
+                    'ed2k://|file|test.mp4|1073741824|1234567890ABCDEF1234567890ABCDEF|/',
+                    'https://example.com/test.mp4'
+                ];
+                
+                testLinks.forEach(function(link) {
+                    const type = detectLinkType(link);
+                    console.log('链接:', link.substring(0, 50) + '... -> 类型:', type);
+                });
+                
+                console.log('✓ 链接解析功能正常');
+            } else {
+                console.error('✗ 缺少必需的DOM元素，应用可能无法正常工作');
+            }
+            
+            console.log('=== 应用测试完成 ===');
+        }
+
+        // 页面加载完成后初始化
+        function initApp() {
+            console.log('开始初始化应用...');
+            
+            try {
+                initializeEventListeners();
+                updateStatsDisplay();
+                testApplication();
+                console.log('✓ 应用初始化完成');
+            } catch (error) {
+                console.error('✗ 应用初始化失败:', error);
+            }
+        }
+
+        // 确保页面加载完成后初始化
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            // 如果页面已经加载完成，直接初始化
+            initApp();
+        }
     </script>
 </body>
 </html>
